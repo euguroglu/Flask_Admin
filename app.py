@@ -1,10 +1,10 @@
-from flask import Flask
+from flask import Flask, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 import os
 from flask_admin.contrib.fileadmin import FileAdmin
-
+from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user
 
 app = Flask(__name__)
 
@@ -15,8 +15,13 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 admin = Admin(app,template_mode='bootstrap3')
+login_manager = LoginManager(app)
 
-class User(db.Model):
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.filter_by(id=int(user_id)).first()
+
+class User(db.Model,UserMixin):
     id = db.Column(db.Integer,primary_key=True)
     username = db.Column(db.String(50))
     password = db.Column(db.String(50))
@@ -47,7 +52,7 @@ class UserView(ModelView):
     inline_models = [Comment]
     #if we set below function false user view wont be there we can set some functionality to authenticate someone to see that panel
     def is_accessible(self):
-        return True
+        return current_user.is_authenticated
     #This is comment when someone try to see admin/user page without authenticated.
     def inaccessible_callback(self,name,**kwargs):
         return '<h1>You are not logged in</h1>'
@@ -62,6 +67,17 @@ admin.add_view(CommentView(Comment,db.session))
 #Flask admin file view
 path = os.path.join(os.path.dirname(__file__),'uploads')
 admin.add_view(FileAdmin(path,'/uploads/',name='Uploads'))
+
+@app.route('/login')
+def login():
+    user = User.query.filter_by(id=1).first()
+    login_user(user)
+    return redirect(url_for('admin'))
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('admin.index'))
 
 if __name__ == "__main__":
     app.run(debug=True)
